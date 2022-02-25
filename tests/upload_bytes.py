@@ -16,13 +16,8 @@ def create_dumb_image():
     return bio
 
 
-r = requests.delete(
-    "http://localhost:8080/test/test.jpg"
-)
-
-
 r = requests.post(
-    "http://localhost:8080/test",
+    "http://localhost:8080/test?overwrite=true",
     headers={"user_id": "1337"},
     files={"test.jpg": create_dumb_image()}
 )

@@ -77,8 +77,18 @@ async def post_image(folder: str):
     user_id = request.headers.get("user_id", None)
     channel_id = request.headers.get("channel_id", None)
     guild_id = request.headers.get("guild_id", None)
+
+    overwrite = request.args.get("overwrite", False) == "true"
+
     if not user_id:
         return standard_json("Missing user_id header", 400)
+
+    try:
+        user_id = int(user_id)
+        channel_id = int(channel_id) if channel_id else None
+        guild_id = int(guild_id) if guild_id else None
+    except ValueError:
+        return standard_json("Invalid user_id, channel_id, or guild_id header, must be int value", 400)
 
     files = await request.files
     if not files:
@@ -108,14 +118,19 @@ async def post_image(folder: str):
             return standard_json(f"The image '{full_filename}' is not a real image...", 400)
 
         if os.path.exists(f"./{db_foldername}/{folder}/{full_filename}"):
-            duplicate.append(full_filename)
-            continue
-
+            if not overwrite:
+                duplicate.append(full_filename)
+                continue
+            db.execute(
+                "UPDATE image SET user_id=?, channel_id=?, guild_id=? WHERE name=?",
+                (user_id, channel_id, guild_id, full_filename)
+            )
+        else:
+            db.execute(
+                "INSERT INTO image (name, user_id, channel_id, guild_id) VALUES (?, ?, ?, ?)",
+                (full_filename, user_id, channel_id, guild_id)
+            )
         img.save(f"./{db_foldername}/{folder}/{full_filename}")
-        db.execute(
-            "INSERT INTO image (name, user_id, channel_id, guild_id) VALUES (?, ?, ?, ?)",
-            (full_filename, user_id, channel_id, guild_id)
-        )
 
     if duplicate and len(duplicate) == len(files):
         return standard_json("All images you attempted to upload already exist", 400)
